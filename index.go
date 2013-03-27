@@ -3,9 +3,9 @@ package main
 import (
 	"./gophers/controllers"
 	"./gophers/plate"
-	"net/http"
 	"flag"
 	"log"
+	"net/http"
 )
 
 var (
