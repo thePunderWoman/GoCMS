@@ -3,9 +3,6 @@ package plate
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/hmac"
-	"crypto/sha1"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -14,13 +11,10 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -102,6 +96,7 @@ type gzipResponseWriter struct {
 }
 
 func NewServer(session_key ...string) *Server {
+	log.Println("NewServer Method")
 	f, err := os.Create("server.log")
 	if err != nil {
 		log.New(os.Stdout, err.Error(), log.Ldate|log.Ltime)
@@ -122,7 +117,7 @@ func NewServer(session_key ...string) *Server {
 
 // Adds a new Route to the Handler
 func (this *Server) AddRoute(method string, pattern string, handler http.HandlerFunc) *Route {
-
+	log.Println("AddRoute: " + pattern)
 	//split the url into sections
 	parts := strings.Split(pattern, "/")
 
@@ -171,33 +166,39 @@ func (this *Server) AddRoute(method string, pattern string, handler http.Handler
 
 // Adds a new Route for GET requests
 func (this *Server) Get(pattern string, handler http.HandlerFunc) *Route {
+	log.Println("Get: " + pattern)
 	return this.AddRoute(GET, pattern, handler)
 }
 
 // Adds a new Route for PUT requests
 func (this *Server) Put(pattern string, handler http.HandlerFunc) *Route {
+	log.Println("Put: " + pattern)
 	return this.AddRoute(PUT, pattern, handler)
 }
 
 // Adds a new Route for DELETE requests
 func (this *Server) Del(pattern string, handler http.HandlerFunc) *Route {
+	log.Println("Del: " + pattern)
 	return this.AddRoute(DELETE, pattern, handler)
 }
 
 // Adds a new Route for PATCH requests
 // See http://www.ietf.org/rfc/rfc5789.txt
 func (this *Server) Patch(pattern string, handler http.HandlerFunc) *Route {
+	log.Println("Patch: " + pattern)
 	return this.AddRoute(PATCH, pattern, handler)
 }
 
 // Adds a new Route for POST requests
 func (this *Server) Post(pattern string, handler http.HandlerFunc) *Route {
+	log.Println("Post: " + pattern)
 	return this.AddRoute(POST, pattern, handler)
 }
 
 // Adds a new Route for Static http requests. Serves
 // static files from the specified directory
 func (this *Server) Static(pattern string, dir string) *Route {
+	log.Println("Static: " + pattern)
 	//append a regex to the param to match everything
 	// that comes after the prefix
 	pattern = pattern + "(.+)"
@@ -210,11 +211,13 @@ func (this *Server) Static(pattern string, dir string) *Route {
 
 // Add middleware filter globally to server
 func (this *Server) AddFilter(filter http.HandlerFunc) {
+	log.Println("AddFilter")
 	this.Filters = append(this.Filters, filter)
 }
 
 // FIlterParam adds the middleware filter if the REST URL parameter exists.
 func (this *Server) FilterParam(param string, filter http.HandlerFunc) {
+	log.Println("FilterParam: " + param)
 	if !strings.HasPrefix(param, ":") {
 		param = ":" + param
 	}
@@ -230,6 +233,7 @@ func (this *Server) FilterParam(param string, filter http.HandlerFunc) {
 // Required by http.Handler interface. This method is invoked by the
 // http server and will handle all page routing
 func (this *Server) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	log.Println("ServeHTTP")
 
 	start_time := time.Now()
 	requestPath := r.URL.Path
@@ -327,15 +331,18 @@ func (this *Server) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (w gzipResponseWriter) Write(b []byte) (int, error) {
+	log.Println("Write")
 	return w.Writer.Write(b)
 }
 
 func makeGzipHandler(fn http.HandlerFunc) http.HandlerFunc {
+	log.Println("makeGzipHandler")
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			fn(w, r)
 			return
 		}
+		log.Println(r.Header.Get("Accept"))
 		w.Header().Set("Content-Encoding", "gzip")
 		gz := gzip.NewWriter(w)
 		defer gz.Close()
@@ -348,12 +355,14 @@ func makeGzipHandler(fn http.HandlerFunc) http.HandlerFunc {
 
 // Header returns the header map that will be sent by WriteHeader.
 func (this *responseWriter) Header() http.Header {
+	log.Println("Header")
 	return this.writer.Header()
 }
 
 // Write writes the data to the connection as part of an HTTP reply,
 // and sets `started` to true
 func (this *responseWriter) Write(p []byte) (int, error) {
+	log.Println("Write")
 	this.size += len(p)
 	this.started = true
 	return this.writer.Write(p)
@@ -362,6 +371,7 @@ func (this *responseWriter) Write(p []byte) (int, error) {
 // WriteHeader sends an HTTP response header with status code,
 // and sets `started` to true
 func (this *responseWriter) WriteHeader(code int) {
+	log.Println("WriteHeader")
 	this.status = code
 	this.started = true
 	this.writer.WriteHeader(code)
@@ -375,6 +385,7 @@ func (this *responseWriter) WriteHeader(code int) {
 // ServeJson replies to the request with a JSON
 // representation of resource v.
 func ServeJson(w http.ResponseWriter, v interface{}) {
+	log.Println("ServeJson")
 	content, err := json.Marshal(v)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -392,6 +403,7 @@ func ServeJson(w http.ResponseWriter, v interface{}) {
 // Request object and stores the result in the value
 // pointed to by v.
 func ReadJson(r *http.Request, v interface{}) error {
+	log.Println("ReadJson")
 	body, err := ioutil.ReadAll(r.Body)
 	r.Body.Close()
 	if err != nil {
@@ -403,6 +415,7 @@ func ReadJson(r *http.Request, v interface{}) error {
 // ServeXml replies to the request with an XML
 // representation of resource v.
 func ServeXml(w http.ResponseWriter, v interface{}) {
+	log.Println("ServeXml")
 	content, err := xml.Marshal(v)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -417,6 +430,7 @@ func ServeXml(w http.ResponseWriter, v interface{}) {
 // Request object and stores the result in the value
 // pointed to by v.
 func ReadXml(r *http.Request, v interface{}) error {
+	log.Println("ReadXml")
 	body, err := ioutil.ReadAll(r.Body)
 	r.Body.Close()
 	if err != nil {
@@ -430,6 +444,7 @@ func ReadXml(r *http.Request, v interface{}) error {
 // format requested by the client specified in the
 // Accept header.
 func ServeFormatted(w http.ResponseWriter, r *http.Request, v interface{}) {
+	log.Println("ServeFormatted")
 	accept := r.Header.Get("Accept")
 	switch accept {
 	case applicationJson:
@@ -450,167 +465,13 @@ func ServeFormatted(w http.ResponseWriter, r *http.Request, v interface{}) {
    ------------------------------ */
 
 func (this *Server) SetLogger(logger *log.Logger) {
+	log.Println("SetLogger")
 	this.Logger = logger
 }
 
 func SetLogger(logger *log.Logger) {
+	log.Println("SetLogger")
 	mainServer.Logger = logger
-}
-
-/* Contextual structs for simpler request/response (AppEngine failure)
-   ------------------------------------- */
-
-type Context struct {
-	Request *http.Request
-	Params  map[string]string
-	Server  *Server
-	ResponseWriter
-}
-
-type ResponseWriter interface {
-	Header() http.Header
-	WriteHeader(status int)
-	Write(data []byte) (n int, err error)
-	Close()
-}
-
-func (ctx *Context) WriteString(content string) {
-	ctx.ResponseWriter.Write([]byte(content))
-}
-
-func (ctx *Context) Abort(status int, body string) {
-	ctx.ResponseWriter.WriteHeader(status)
-	ctx.ResponseWriter.Write([]byte(body))
-}
-
-func (ctx *Context) Redirect(status int, url_ string) {
-	ctx.ResponseWriter.Header().Set("Location", url_)
-	ctx.ResponseWriter.WriteHeader(status)
-	ctx.ResponseWriter.Write([]byte("Redirecting to: " + url_))
-}
-
-func (ctx *Context) NotModified() {
-	ctx.ResponseWriter.WriteHeader(304)
-}
-
-func (ctx *Context) NotFound(message string) {
-	ctx.ResponseWriter.WriteHeader(404)
-	ctx.ResponseWriter.Write([]byte(message))
-}
-
-//Sets the content type by extension, as defined in the mime package. 
-//For example, ctx.ContentType("json") sets the content-type to "application/json"
-func (ctx *Context) ContentType(ext string) {
-	if !strings.HasPrefix(ext, ".") {
-		ext = "." + ext
-	}
-	ctype := mime.TypeByExtension(ext)
-	if ctype != "" {
-		ctx.Header().Set("Content-Type", ctype)
-	}
-}
-
-func (ctx *Context) SetHeader(hdr string, val string, unique bool) {
-	if unique {
-		ctx.Header().Set(hdr, val)
-	} else {
-		ctx.Header().Add(hdr, val)
-	}
-}
-
-//Sets a cookie -- duration is the amount of time in seconds. 0 = forever
-func (ctx *Context) SetCookie(name string, value string, age int64) {
-	var utctime time.Time
-	if age == 0 {
-		// 2^31 - 1 seconds (roughly 2038)
-		utctime = time.Unix(2147483647, 0)
-	} else {
-		utctime = time.Unix(time.Now().Unix()+age, 0)
-	}
-	cookie := fmt.Sprintf("%s=%s; expires=%s", name, value, webTime(utctime))
-	ctx.SetHeader("Set-Cookie", cookie, false)
-}
-
-func getCookieSig(key string, val []byte, timestamp string) string {
-	hm := hmac.New(sha1.New, []byte(key))
-
-	hm.Write(val)
-	hm.Write([]byte(timestamp))
-
-	hex := fmt.Sprintf("%02x", hm.Sum(nil))
-	return hex
-}
-
-func (ctx *Context) SetSecureCookie(name string, val string, age int64) {
-	//base64 encode the val
-	if len(ctx.Server.Config.CookieSecret) == 0 {
-		ctx.Server.Logger.Println("Secret Key for secure cookies has not been set. Please assign a cookie secret to web.Config.CookieSecret.")
-		return
-	}
-	var buf bytes.Buffer
-	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
-	encoder.Write([]byte(val))
-	encoder.Close()
-	vs := buf.String()
-	vb := buf.Bytes()
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	sig := getCookieSig(ctx.Server.Config.CookieSecret, vb, timestamp)
-	cookie := strings.Join([]string{vs, timestamp, sig}, "|")
-	ctx.SetCookie(name, cookie, age)
-}
-func (ctx *Context) GetSecureCookie(name string) (string, bool) {
-	for _, cookie := range ctx.Request.Cookies() {
-		if cookie.Name != name {
-			continue
-		}
-
-		parts := strings.SplitN(cookie.Value, "|", 3)
-
-		val := parts[0]
-		timestamp := parts[1]
-		sig := parts[2]
-
-		if getCookieSig(ctx.Server.Config.CookieSecret, []byte(val), timestamp) != sig {
-			return "", false
-		}
-
-		ts, _ := strconv.ParseInt(timestamp, 0, 64)
-
-		if time.Now().Unix()-31*86400 > ts {
-			return "", false
-		}
-
-		buf := bytes.NewBufferString(val)
-		encoder := base64.NewDecoder(base64.StdEncoding, buf)
-
-		res, _ := ioutil.ReadAll(encoder)
-		return string(res), true
-	}
-	return "", false
-}
-
-// small optimization: cache the context type instead of repeteadly calling reflect.Typeof
-var contextType reflect.Type
-
-var exeFile string
-
-// default
-func defaultStaticDir() string {
-	root, _ := path.Split(exeFile)
-	return path.Join(root, "static")
-}
-
-func init() {
-	contextType = reflect.TypeOf(Context{})
-	//find the location of the exe file
-	arg0 := path.Clean(os.Args[0])
-	wd, _ := os.Getwd()
-	if strings.HasPrefix(arg0, "/") {
-		exeFile = arg0
-	} else {
-		//TODO for robustness, search each directory in $PATH
-		exeFile = path.Join(wd, arg0)
-	}
 }
 
 /* Some useful stuff
@@ -625,6 +486,7 @@ type ServerConfig struct {
 }
 
 func webTime(t time.Time) string {
+	log.Println("webTime")
 	ftime := t.Format(time.RFC1123)
 	if strings.HasSuffix(ftime, "UTC") {
 		ftime = ftime[0:len(ftime)-3] + "GMT"
@@ -633,6 +495,7 @@ func webTime(t time.Time) string {
 }
 
 func dirExists(dir string) bool {
+	log.Println("dirExists")
 	d, e := os.Stat(dir)
 	switch {
 	case e != nil:
@@ -645,6 +508,7 @@ func dirExists(dir string) bool {
 }
 
 func fileExists(dir string) bool {
+	log.Println("fileExists")
 	info, err := os.Stat(dir)
 	if err != nil {
 		return false
@@ -654,6 +518,7 @@ func fileExists(dir string) bool {
 }
 
 func Urlencode(data map[string]string) string {
+	log.Println("Urlencode")
 	var buf bytes.Buffer
 	for k, v := range data {
 		buf.WriteString(url.QueryEscape(k))
@@ -666,6 +531,7 @@ func Urlencode(data map[string]string) string {
 }
 
 func Serve404(w http.ResponseWriter, error string) {
+	log.Println("Serve404")
 	bag := make(map[string]interface{})
 
 	tmpl, err := template.New("404.html").ParseFiles("templates/404.html")
@@ -687,6 +553,7 @@ type StatusService struct {
 }
 
 func NewStatusService() *StatusService {
+	log.Println("NewStatusService")
 	return &StatusService{
 		Start:             time.Now(),
 		Pid:               os.Getpid(),
@@ -696,6 +563,7 @@ func NewStatusService() *StatusService {
 }
 
 func (self *StatusService) Update(status_code int, response_time *time.Duration) {
+	log.Println("Update")
 	self.Lock.Lock()
 	self.ResponseCounts[fmt.Sprintf("%d", status_code)]++
 	self.TotalResponseTime = self.TotalResponseTime.Add(*response_time)
@@ -717,6 +585,7 @@ type Status struct {
 }
 
 func (self *StatusService) GetStatus(w http.ResponseWriter, r *http.Request) {
+	log.Println("GetStatus")
 
 	now := time.Now()
 

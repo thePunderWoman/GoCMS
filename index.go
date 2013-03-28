@@ -30,7 +30,9 @@ func main() {
 	server.Get("/", controllers.Index)
 
 	http.Handle("/", server)
-	http.ListenAndServe(*listenAddr, nil)
 
 	log.Println("Server running on port " + *listenAddr)
+
+	log.Fatal(http.ListenAndServe(*listenAddr, nil))
+
 }
